@@ -1,0 +1,86 @@
+All you need to turn in is your proj2.c
+
+I will compile your proj2 as follows.
+  > cc proj2.c -O -lm6378 -o proj2
+and run it, for example
+  > m6378run 4 proj2 10 50 10
+
+10 ~ defined I (number of local grid points) in test4.c
+50 ~ defined NITS in test4.c.
+10 is the number of outer iterations which is not in test4.c
+
+Please be consistent with this.
+
+
+
+Here's what I did to modify test4.c
+In my code I typed 4 new int variables in main
+
+  int n_local_gps, n_inner_its, n_outer_its, no;
+
+and just after M6378_Comm_rank( &myid ) I added this.
+
+  if( argc == 4 ) {
+    n_local_gps = atoi( argv[1] );
+    n_inner_its = atoi( argv[2] );
+    n_outer_its = atoi( argv[3] );
+    if( n_local_gps <= 0 || n_inner_its <= 0 || n_outer_its <= 0 ) {
+      if( myid == 0 )
+        fprintf( stderr, "Integer command line args must be positive.\n" );
+      some kind of exit...
+    }
+  } else {
+    if( myid == 0 )
+      fprintf( stderr, "Usage %s n_local_gps n_inner_its n_outer_its\n", argv[0] );
+    some kind of exit...
+  }
+
+
+Also, in test4.c I substituted 
+
+  I with n_local_gps,
+  NITS with n_inner_its,
+
+and added a new outer loop just after the initialization loop
+
+  // bcs and interior uold array.
+  for( i=0; i <= n_local_gps; i++ ) {
+    uold[i] = 0.0;
+  }
+  ***
+  for( no = 0; no < n_outer_its; no++ ) {                      (new)
+    // bcs in unew array.                                      (moved from ***)
+    unew[0] = uold[0]; unew[n_local_gps] = uold[n_local_gps];  (moved and modified)
+ 
+    ...
+
+    // finally add in error.
+    for( i = 0; i <= n_local_gps; i++ ) {
+      float theta = i*oI;
+      uold[i] += (1.0-theta)*e[0] + theta*e[1]; 
+    }
+  } // end n_outer_its loop.                                   (new)
+
+Finally, in the "master dump to stdout" block of code, 
+I changed the loop from
+
+      for( i = 0; i <=I; i++ ) {
+
+in test4.c to
+
+      for( i = 1; i <= n_local_gps; i++ ) {
+
+so that the interface points do not print out twice.
+
+I also wrapped all message passing, Isend(), Recv() and Wait(), to
+something like this
+
+      if( !M6378_Recv( myid+1, &urr, NULL ) )
+        goto some kind of exit
+
+so that any kind of communication error will terminate the program.
+
+
+That's pretty much it.
+I'll turn the submit server on when I get back from the university.
+Have fun.
